@@ -26,19 +26,17 @@ Pink_Monster_Run_6 = [
     (39, 4, 18, 27),
 ]
 
-Pink_Monster_Jump_8 = [
-    (2, 0, 21, 31),
-    (35, 0, 21, 31),
-    (68, 0, 21, 31),
-    (98, 0, 21, 31),
-    (130, 0, 21, 31),
-    (168, 0, 21, 31),
-    (196, 0, 21, 31),
-    (226, 0, 21, 31),
+Pink_Monster_Jump_6 = [
+    (4, 0, 21, 31),
+    (100, 0, 21, 31),
+    (132, 0, 21, 31),
+    (132, 0, 21, 31),
+    (164, 0, 21, 31),
+    (228, 0, 21, 31),
 ]
 
 
 animation_pos_list = []
 animation_pos_list.append(Pink_Monster_Idle_4)
 animation_pos_list.append(Pink_Monster_Run_6)
-animation_pos_list.append(Pink_Monster_Jump_8)
+animation_pos_list.append(Pink_Monster_Jump_6)

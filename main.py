@@ -1,10 +1,14 @@
+# Libraries
 import pygame
+import csv
+
+# Files
 import variables
 
 pygame.init()
 
 SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_HEIGHT = 608
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Getting Through It')
@@ -16,6 +20,11 @@ FPS = 60
 
 # Define game variables
 GRAVITY = 0.75
+ROWS = 19
+COLS = 25
+
+TILE_SIZE = 32
+level = 1
 
 # Defined player action variable
 moving_left = False
@@ -29,6 +38,14 @@ RED = (255, 0, 0)
 def draw_bg():
     screen.fill(BG)
     pygame.draw.line(screen, RED, (0, 500), (SCREEN_WIDTH, 500))
+
+
+# class World():
+#     def __init__(self):
+#         self.obstacle_list = []
+
+#     def process_data(self, data):
+#         # Iterate through each value in level data file
 
 
 class Entity(pygame.sprite.Sprite):
@@ -54,7 +71,7 @@ class Entity(pygame.sprite.Sprite):
 
         # Names of the image files
         animation_types = ['Pink_Monster_Idle_4',
-                           'Pink_Monster_Run_6', 'Pink_Monster_Jump_8']
+                           'Pink_Monster_Run_6', 'Pink_Monster_Jump_6']
         animation_frames = [4, 6, 8]
 
         self.update_time = pygame.time.get_ticks()
@@ -85,34 +102,6 @@ class Entity(pygame.sprite.Sprite):
 
             self.animation_list.append(temp_list)
 
-        # # Idle animation loading
-        # temp_anim_list = []
-        # for i in range(4):
-        #     idle_img_builder = self.idle_animation_sheet_image.subsurface(
-        #         variables.idle_frame_arr[i])
-        #     idle_img_builder = pygame.transform.scale(
-        #         idle_img_builder, (idle_img_builder.get_height()*scale, idle_img_builder.get_width()*scale*2))
-        #     temp_anim_list.append(idle_img_builder)
-        # self.animation_list.append(temp_anim_list)
-        # # Run animation loading
-        # temp_anim_list = []
-        # for i in range(6):
-        #     run_img_builder = self.run_animation_sheet_image.subsurface(
-        #         variables.run_frame_arr[i])
-        #     run_img_builder = pygame.transform.scale(
-        #         run_img_builder, (run_img_builder.get_height()*scale, run_img_builder.get_width()*scale*2))
-        #     temp_anim_list.append(run_img_builder)
-        # self.animation_list.append(temp_anim_list)
-        # # jump animation loading
-        # temp_anim_list = []
-        # for i in range(8):
-        #     jump_img_builder = self.jump_animation_sheet_image.subsurface(
-        #         variables.jump_frame_arr[i])
-        #     jump_img_builder = pygame.transform.scale(
-        #         jump_img_builder, (jump_img_builder.get_height()*scale, jump_img_builder.get_width()*scale*2))
-        #     temp_anim_list.append(jump_img_builder)
-        # self.animation_list.append(temp_anim_list)
-
         self.image = self.animation_list[self.action][self.frame_index]
         self.image_rect = self.image.get_rect()
         self.image_rect.center = (x, y)
@@ -123,19 +112,28 @@ class Entity(pygame.sprite.Sprite):
     def update_animation(self):
         # Update animation
         ANIMATION_COOLDOWN = 200
-
+        JUMP_ANIMATION_COOLDOWN = 80
         # Update image depending on current frame
         self.image = self.animation_list[self.action][self.frame_index]
 
         # Check if enough time has passed since last update
-        if pygame.time.get_ticks() - self.update_time > ANIMATION_COOLDOWN:
-            self.update_time = pygame.time.get_ticks()
-            self.frame_index += 1
+        if self.action == 2:
+            if pygame.time.get_ticks() - self.update_time > JUMP_ANIMATION_COOLDOWN:
+                self.update_time = pygame.time.get_ticks()
+                self.frame_index += 1
 
-        # TODO: FIX
-        # If animation frames run out, restart
-        if self.frame_index >= len(self.animation_list[self.action]):
-            self.frame_index = 0
+            # If animation frames run out, restart
+            if self.frame_index >= len(self.animation_list[self.action]):
+                self.frame_index = 0
+
+        else:
+            if pygame.time.get_ticks() - self.update_time > ANIMATION_COOLDOWN:
+                self.update_time = pygame.time.get_ticks()
+                self.frame_index += 1
+
+            # If animation frames run out, restart
+            if self.frame_index >= len(self.animation_list[self.action]):
+                self.frame_index = 0
 
     def update_action(self, new_action):
 
@@ -177,7 +175,7 @@ class Entity(pygame.sprite.Sprite):
 
         if self.jump and not self.in_air:
             # Jump height
-            self.vel_y = -20
+            self.vel_y = -13
             self.jump = False
             self.in_air = True
 
@@ -188,8 +186,8 @@ class Entity(pygame.sprite.Sprite):
         dy += self.vel_y
 
         # Check collision w/ floor
-        if self.image_rect.bottom + dy > 425:
-            dy = 425 - self.image_rect.bottom
+        if self.image_rect.bottom + dy > 423:
+            dy = 423 - self.image_rect.bottom
             self.in_air = False
 
         # Update rect position
@@ -198,6 +196,19 @@ class Entity(pygame.sprite.Sprite):
 
 
 player = Entity(200, 200, 2, 5)
+
+# Create empty tile list
+world_data = []
+for row in range(ROWS):
+    r = [-1] * COLS
+    world_data.append(r)
+
+# Load in level data and create world
+with open(f'assets/level{level}_data.csv', newline='') as csvfile:
+    reader = csv.reader(csvfile, delimiter=',')
+    for x, row in enumerate(reader):
+        for y, tile in enumerate(row):
+            world_data[x][y] = int(tile)
 
 run = True
 while run:
