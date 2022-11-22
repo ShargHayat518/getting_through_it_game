@@ -22,13 +22,21 @@ FPS = 60
 GRAVITY = 0.75
 ROWS = 19
 COLS = 25
-
 TILE_SIZE = 32
+TILE_TYPES = 179
 level = 1
 
 # Defined player action variable
 moving_left = False
 moving_right = False
+
+# Load images, store tiles in a list
+tile_img_list = []
+for x in range(TILE_TYPES):
+    img = pygame.image.load('assets/world/Tiles/{x}}.png')
+    img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
+    tile_img_list.append(img)
+
 
 # Define colors
 BG = (0, 0, 0)
@@ -40,12 +48,26 @@ def draw_bg():
     pygame.draw.line(screen, RED, (0, 500), (SCREEN_WIDTH, 500))
 
 
-# class World():
-#     def __init__(self):
-#         self.obstacle_list = []
+class World():
+    def __init__(self):
+        self.obstacle_list = []
 
-#     def process_data(self, data):
-#         # Iterate through each value in level data file
+    def process_data(self, data):
+        # Iterate through each value in level data file
+        for y, row in enumerate(data):
+            for x, tile in enumerate(row):
+                if tile >= 0:
+                    img = tile_img_list[tile]
+                    img_rect = img.get_rect()
+                    img_rect.x = x * TILE_SIZE
+                    img_rect.y = y * TILE_SIZE
+                    tile_data = (img, img_rect)
+
+                    # TODO: Change later to determine which blocks are obstacle blocks
+                    if tile == 0:
+                        self.obstacle_list.append(tile_data)
+                    elif tile > 0:
+                        pass
 
 
 class Entity(pygame.sprite.Sprite):
