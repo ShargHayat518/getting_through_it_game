@@ -19,7 +19,7 @@ clock = pygame.time.Clock()
 FPS = 60
 
 # Define game variables
-GRAVITY = 0.75
+GRAVITY = 0.8
 ROWS = 19
 COLS = 25
 TILE_SIZE = 32
@@ -33,7 +33,7 @@ moving_right = False
 # Load images, store tiles in a list
 tile_img_list = []
 for x in range(TILE_TYPES):
-    img = pygame.image.load('assets/world/Tiles/{x}}.png')
+    img = pygame.image.load(f'assets/world/Tiles/{x}.png')
     img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
     tile_img_list.append(img)
 
@@ -45,7 +45,6 @@ RED = (255, 0, 0)
 
 def draw_bg():
     screen.fill(BG)
-    pygame.draw.line(screen, RED, (0, 500), (SCREEN_WIDTH, 500))
 
 
 class World():
@@ -53,21 +52,43 @@ class World():
         self.obstacle_list = []
 
     def process_data(self, data):
-        # Iterate through each value in level data file
+        # Iterate through each row in level csv data file
         for y, row in enumerate(data):
+            # Iterate through each cell of the row
+            # tile = cell
             for x, tile in enumerate(row):
+                # This refers to the value inside the cell/tile and NOT the index/location of the cell!
                 if tile >= 0:
-                    img = tile_img_list[tile]
-                    img_rect = img.get_rect()
-                    img_rect.x = x * TILE_SIZE
-                    img_rect.y = y * TILE_SIZE
-                    tile_data = (img, img_rect)
-
                     # TODO: Change later to determine which blocks are obstacle blocks
-                    if tile == 0:
+                    # Grass blocks
+                    if tile == 75:
+                        tile_data = self.tile_processor(tile, x, y)
                         self.obstacle_list.append(tile_data)
-                    elif tile > 0:
-                        pass
+
+                        # Dirt blocks
+                    if tile == 122:
+                        tile_data = self.tile_processor(tile, x, y)
+                        self.obstacle_list.append(tile_data)
+
+                        # Player spawn location
+                    elif tile == 777:
+                        player = Entity(x * TILE_SIZE, y * TILE_SIZE, 1.5, 3)
+
+        return player
+
+    def draw(self):
+
+        for tile in self.obstacle_list:
+            tile_temp = (tile[1])
+            screen.blit(tile[0], tile[1])
+
+    def tile_processor(self, tile, x, y):
+        img = tile_img_list[tile]
+        img_rect = img.get_rect()
+        img_rect.x = x * TILE_SIZE
+        img_rect.y = y * TILE_SIZE
+        tile_data = (img, img_rect)
+        return tile_data
 
 
 class Entity(pygame.sprite.Sprite):
@@ -127,6 +148,8 @@ class Entity(pygame.sprite.Sprite):
         self.image = self.animation_list[self.action][self.frame_index]
         self.image_rect = self.image.get_rect()
         self.image_rect.center = (x, y)
+        self.width = self.image.get_width()
+        self.height = self.image.get_height()
         #####
         #####
         #####
@@ -168,14 +191,12 @@ class Entity(pygame.sprite.Sprite):
             self.update_time = pygame.time.get_ticks()
 
     def draw(self):
-        # screen.blit(pygame.transform.flip(
-        #     self.image, self.flip, False), self.rect)
 
         screen.blit(
             # Source
             pygame.transform.flip(self.image, self.flip, False),
             # Destination
-            (self.image_rect.midbottom))
+            (self.image_rect.x, self.image_rect.y))
 
     def move(self, moving_left, moving_right):
 
@@ -197,7 +218,7 @@ class Entity(pygame.sprite.Sprite):
 
         if self.jump and not self.in_air:
             # Jump height
-            self.vel_y = -13
+            self.vel_y = -10
             self.jump = False
             self.in_air = True
 
@@ -208,38 +229,90 @@ class Entity(pygame.sprite.Sprite):
         dy += self.vel_y
 
         # Check collision w/ floor
-        if self.image_rect.bottom + dy > 423:
-            dy = 423 - self.image_rect.bottom
-            self.in_air = False
+        for tile in world.obstacle_list:
+
+            # # Check collision in x direction
+            if tile[1].colliderect(self.image_rect.x + dx, self.image_rect.y, self.width, self.height):
+                dx = 0
+
+            # Check for collision in y direction
+            if tile[1].colliderect(self.image_rect.x, self.image_rect.y + dy, self.width, self.height):
+                # print(f'tile x: {tile[1].x}, tile y: {tile[1].y}, player_x: {self.image_rect.x}, player_y: {self.image_rect.y + dy}, player_center: {self.image_rect.center}, image_rect.midbottom: {self.image_rect.midbottom}')
+                # Check if below the ground
+                if self.vel_y < 0:
+                    pass
+                    # TODO: Fix collision when players head hits bottom of a tile
+                    self.vel_y = 0
+                    dy = 0
+                    # dy = tile[1].bottom - self.image_rect.top
+                    # print(f'dy: {dy}')
+                    # print(f'tile[1].bottom: {tile[1].bottom}')
+                    # print(f'self.image_rect.top: {self.image_rect.top}')
+
+                    # Check if above the ground (falling)
+                if self.vel_y >= 0:
+                    self.vel_y = 0
+                    self.in_air = False
+                    # dy = tile[1].top - self.image_rect.bottom
+                    dy = 0
 
         # Update rect position
         self.image_rect.x += dx
         self.image_rect.y += dy
 
 
-player = Entity(200, 200, 2, 5)
+# player = Entity(200, 200, 2, 5)
 
+'''World Processing & Player Creation'''
 # Create empty tile list
 world_data = []
 for row in range(ROWS):
     r = [-1] * COLS
     world_data.append(r)
 
-# Load in level data and create world
+# Load in level data csv and create world
 with open(f'assets/level{level}_data.csv', newline='') as csvfile:
     reader = csv.reader(csvfile, delimiter=',')
     for x, row in enumerate(reader):
         for y, tile in enumerate(row):
             world_data[x][y] = int(tile)
 
+
+world = World()
+
+# TODO: THERES A BIG PROBLEM WITH THIS!!
+player = world.process_data(world_data)
+''''''
+
 run = True
 while run:
 
     clock.tick(FPS)
 
+    # Update background
     draw_bg()
+
+    # Draw world map
+    world.draw()
+    # pygame.draw.line(screen, RED, (288, 428), (SCREEN_WIDTH, 428))
+    # pygame.draw.line(screen, RED, (0, 277.5), (SCREEN_WIDTH, 277.5))
+
+    # for x in range(19):
+    #     pygame.draw.line(screen, RED, (0, x*32), (SCREEN_WIDTH, x*32))
+    # for y in range(25):
+    #     pygame.draw.line(screen, RED, (y*32, 0), (y*32, SCREEN_HEIGHT))
+
+    # mouse_cursor
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+
+    font = pygame.font.SysFont(None, 24)
+    font_img = font.render(f'{mouse_x},{mouse_y}', True, (0, 255, 255))
+    screen.blit(font_img, (mouse_x + 3, mouse_y - 12))
+
     player.update_animation()
     player.draw()
+    pygame.draw.line(screen, RED, (0, player.image_rect.top),
+                     (SCREEN_WIDTH, player.image_rect.top))
 
     # Update player actions
     if player.alive:
