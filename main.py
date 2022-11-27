@@ -20,6 +20,7 @@ FPS = 60
 
 # Define game variables
 GRAVITY = 0.8
+SCROLL_THRESH = 200
 ROWS = 19
 COLS = 25
 TILE_SIZE = 32
@@ -30,7 +31,10 @@ level = 1
 moving_left = False
 moving_right = False
 
-# Load images, store tiles in a list
+# Load background images
+level_1_img = pygame.image.load(f'assets/world/backgrounds/04.png')
+
+# Load tile images, store tiles in a list
 tile_img_list = []
 for x in range(TILE_TYPES):
     img = pygame.image.load(f'assets/world/Tiles/{x}.png')
@@ -45,6 +49,7 @@ RED = (255, 0, 0)
 
 def draw_bg():
     screen.fill(BG)
+    screen.blit(level_1_img, (0, 0))
 
 
 class World():
@@ -114,7 +119,7 @@ class Entity(pygame.sprite.Sprite):
 
         # Names of the image files
         animation_types = ['Pink_Monster_Idle_4',
-                           'Pink_Monster_Run_6', 'Pink_Monster_Jump_6']
+                           'Pink_Monster_Run_6_v2', 'Pink_Monster_Jump_6']
         animation_frames = [4, 6, 8]
 
         self.update_time = pygame.time.get_ticks()
