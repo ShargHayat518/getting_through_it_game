@@ -1,10 +1,12 @@
 # Libraries
+import time
 import pygame
+from pygame import mixer
 import csv
 
 # Files
 import variables
-
+mixer.init()
 pygame.init()
 
 SCREEN_WIDTH = 800
@@ -20,19 +22,54 @@ FPS = 60
 
 # Define game variables
 GRAVITY = 0.8
-SCROLL_THRESH = 200
+SCROLL_THRESH = 300
 ROWS = 19
-COLS = 25
+COLS = 32
 TILE_SIZE = 32
 TILE_TYPES = 179
+MAX_LEVELS = 11
+
+# Level variables
+screen_scroll = 0
+bg_scroll = 0
 level = 1
+start_game = False
 
 # Defined player action variable
 moving_left = False
 moving_right = False
 
+# Load music and sounds
+# Music Handling:
+menu_music_playing = False
+levels_1to5_music_playing = False
+
+jump_sound = pygame.mixer.Sound('assets/audio/sounds/jump_sound.ogg')
+jump_sound.set_volume(0.5)
+level_complete_sound = pygame.mixer.Sound(
+    'assets/audio/sounds/level_complete_sound.ogg')
+level_complete_sound.set_volume(0.2)
+death_sound = pygame.mixer.Sound('assets/audio/sounds/death_sound.wav')
+death_sound.set_volume(0.5)
+
 # Load background images
 level_1_img = pygame.image.load(f'assets/world/backgrounds/04.png')
+
+# Load menu images
+start_btn_sheet = pygame.image.load(
+    f'assets/menu/start_btn.png').convert_alpha()
+start_btn_UP = start_btn_sheet.subsurface(variables.btn_UP)
+start_btn_DOWN = start_btn_sheet.subsurface(variables.btn_DOWN)
+
+exit_btn_sheet = pygame.image.load(
+    f'assets/menu/exit_btn.png').convert_alpha()
+exit_btn_UP = exit_btn_sheet.subsurface(variables.btn_UP)
+exit_btn_DOWN = exit_btn_sheet.subsurface(variables.btn_DOWN)
+
+restart_btn_sheet = pygame.image.load(
+    f'assets/menu/restart_btn.png').convert_alpha()
+restart_btn_UP = restart_btn_sheet.subsurface(variables.btn_UP)
+restart_btn_DOWN = restart_btn_sheet.subsurface(variables.btn_DOWN)
 
 # Load tile images, store tiles in a list
 tile_img_list = []
@@ -52,9 +89,63 @@ def draw_bg():
     screen.blit(level_1_img, (0, 0))
 
 
+def reset_level():
+    # Create empty tile list
+    data = []
+    for row in range(ROWS):
+        r = [-1] * COLS
+        data.append(r)
+
+    return data
+
+
+class Button():
+
+    def __init__(self, x, y, image, image_pressed, scale):
+        width = image.get_width()
+        height = image.get_height()
+
+        # Normal button
+        self.image = pygame.transform.scale(
+            image, (int(width * scale), int(height * scale)))
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+
+        # Pressed button
+        self.image_pressed = pygame.transform.scale(
+            image_pressed, (int(width * scale), int(height * scale)))
+        self.rect_pressed = self.image_pressed.get_rect()
+        self.rect_pressed.topleft = (x, y)
+
+        self.clicked = False
+        self.action = False
+
+    def draw(self, surface):
+        # Get mouse position
+        pos = pygame.mouse.get_pos()
+
+        if self.rect.collidepoint(pos):
+            if pygame.mouse.get_pressed()[0] == 1 and self.clicked == False:
+                self.action = True
+                self.clicked = True
+
+        if pygame.mouse.get_pressed()[0] == 0:
+            self.clicked = False
+
+        # Draw button
+        if self.clicked == False:
+            surface.blit(self.image, (self.rect.x, self.rect.y))
+        else:
+            surface.blit(self.image_pressed, (self.rect.x, self.rect.y))
+
+        return self.action
+
+
 class World():
     def __init__(self):
         self.obstacle_list = []
+        self.decoration_list = []
+        self.completion_list = []
 
     def process_data(self, data):
         # Iterate through each row in level csv data file
@@ -64,35 +155,56 @@ class World():
             for x, tile in enumerate(row):
                 # This refers to the value inside the cell/tile and NOT the index/location of the cell!
                 if tile >= 0:
-                    # TODO: Change later to determine which blocks are obstacle blocks
+                    # Boundry blocks:
+                    if tile == 11 or tile == 121 or tile == 123:
+                        tile_data = self.tile_processor(tile, x, y)
+                        self.obstacle_list.append(tile_data)
+
                     # Grass blocks
                     if tile == 75:
                         tile_data = self.tile_processor(tile, x, y)
                         self.obstacle_list.append(tile_data)
 
-                        # Dirt blocks
+                    # Dirt blocks
                     if tile == 122:
                         tile_data = self.tile_processor(tile, x, y)
                         self.obstacle_list.append(tile_data)
 
-                        # Player spawn location
-                    elif tile == 777:
+                    # Completion blocks (flag)
+                    for comp_tile in variables.completion_tile_list:
+                        if tile == comp_tile:
+                            tile_data = self.tile_processor(tile, x, y)
+                            self.completion_list.append(tile_data)
+
+                    # Decoration blocks
+                    for dec_tile in variables.dec_tile_list:
+                        if tile == dec_tile:
+                            tile_data = self.tile_processor(tile, x, y)
+                            self.decoration_list.append(tile_data)
+
+                    # Player spawn location
+                    if tile == 777:
                         player = Entity(x * TILE_SIZE, y * TILE_SIZE, 1.5, 3)
 
         return player
 
     def draw(self):
-
-        for tile in self.obstacle_list:
-            tile_temp = (tile[1])
-            screen.blit(tile[0], tile[1])
+        for obs_tile in self.obstacle_list:
+            obs_tile[1][0] += screen_scroll
+            screen.blit(obs_tile[0], obs_tile[1])
+        for dec_tile in self.decoration_list:
+            dec_tile[1][0] += screen_scroll
+            screen.blit(dec_tile[0], dec_tile[1])
+        for completion_tile in self.completion_list:
+            completion_tile[1][0] += screen_scroll
+            screen.blit(completion_tile[0], completion_tile[1])
 
     def tile_processor(self, tile, x, y):
         img = tile_img_list[tile]
         img_rect = img.get_rect()
         img_rect.x = x * TILE_SIZE
         img_rect.y = y * TILE_SIZE
-        tile_data = (img, img_rect)
+        tile_data = (img, img_rect, tile)
         return tile_data
 
 
@@ -210,6 +322,9 @@ class Entity(pygame.sprite.Sprite):
         dx = 0
         dy = 0
 
+        # Screen handling
+        screen_scroll = 0
+
         # Assigning movement
         if moving_left:
             dx = -self.speed
@@ -233,7 +348,7 @@ class Entity(pygame.sprite.Sprite):
             self.vel_y = 10
         dy += self.vel_y
 
-        # Check collision w/ floor
+        # Check collision w/ tiles
         for tile in world.obstacle_list:
 
             # # Check collision in x direction
@@ -242,33 +357,57 @@ class Entity(pygame.sprite.Sprite):
 
             # Check for collision in y direction
             if tile[1].colliderect(self.image_rect.x, self.image_rect.y + dy, self.width, self.height):
-                # print(f'tile x: {tile[1].x}, tile y: {tile[1].y}, player_x: {self.image_rect.x}, player_y: {self.image_rect.y + dy}, player_center: {self.image_rect.center}, image_rect.midbottom: {self.image_rect.midbottom}')
                 # Check if below the ground
                 if self.vel_y < 0:
-                    pass
-                    # TODO: Fix collision when players head hits bottom of a tile
                     self.vel_y = 0
                     dy = 0
-                    # dy = tile[1].bottom - self.image_rect.top
-                    # print(f'dy: {dy}')
-                    # print(f'tile[1].bottom: {tile[1].bottom}')
-                    # print(f'self.image_rect.top: {self.image_rect.top}')
 
-                    # Check if above the ground (falling)
+                # Check if above the ground (falling)
                 if self.vel_y >= 0:
                     self.vel_y = 0
                     self.in_air = False
-                    # dy = tile[1].top - self.image_rect.bottom
                     dy = 0
+
+        # Check collision w/ level completion flag
+        level_complete = False
+        for tile in world.completion_list:
+            if tile[1].colliderect(self.image_rect.x + dx, self.image_rect.y, self.width, self.height):
+                level_complete_sound.play()
+                level_complete = True
+
+        # Check if player goes off edge of screen WIDTH (left/right)
+        if self.image_rect.left + dx < 0 or self.image_rect.right + dx > SCREEN_WIDTH:
+            dx = 0
+
+        # Check if player falls off edge of screen HEIGHT (bottom/top)
+        if self.image_rect.bottom > SCREEN_HEIGHT or self.image_rect.top < 0:
+            death_sound.play()
+            player.alive = False
 
         # Update rect position
         self.image_rect.x += dx
         self.image_rect.y += dy
 
+        # Update scroll based on player position
+        if self.image_rect.right > SCREEN_WIDTH - SCROLL_THRESH or self.image_rect.left < SCROLL_THRESH:
+            self.image_rect.x -= dx
+            screen_scroll = -dx
 
-# player = Entity(200, 200, 2, 5)
+        return screen_scroll, level_complete
 
-'''World Processing & Player Creation'''
+
+'''World Processing & Player Creation & Menu Handling'''
+
+# Buttons & Menu
+start_button = Button((SCREEN_WIDTH // 2) - 75,
+                      SCREEN_HEIGHT // 2 - 50, start_btn_UP, start_btn_DOWN, 3)
+
+exit_button = Button((SCREEN_WIDTH // 2) - 75,
+                     SCREEN_HEIGHT // 2 + 25, exit_btn_UP, exit_btn_DOWN, 3)
+
+restart_button = Button((SCREEN_WIDTH // 2) - 75,
+                        SCREEN_HEIGHT // 2 - 50, restart_btn_UP, restart_btn_DOWN, 3)
+
 # Create empty tile list
 world_data = []
 for row in range(ROWS):
@@ -285,7 +424,7 @@ with open(f'assets/level{level}_data.csv', newline='') as csvfile:
 
 world = World()
 
-# TODO: THERES A BIG PROBLEM WITH THIS!!
+# TODO: THERES A BIG PROBLEM WITH THIS?!?!
 player = world.process_data(world_data)
 ''''''
 
@@ -294,44 +433,122 @@ while run:
 
     clock.tick(FPS)
 
-    # Update background
-    draw_bg()
+    # Interface handling
+    if start_game == False:
 
-    # Draw world map
-    world.draw()
-    # pygame.draw.line(screen, RED, (288, 428), (SCREEN_WIDTH, 428))
-    # pygame.draw.line(screen, RED, (0, 277.5), (SCREEN_WIDTH, 277.5))
+        if menu_music_playing == False:
+            menu_music_playing = True
+            menu_music = pygame.mixer.music.load(
+                'assets/audio/music/Komiku_-_02_-_Poupis_Theme.mp3')
+            pygame.mixer.music.set_volume(0.5)
+            pygame.mixer.music.play()
 
-    # for x in range(19):
-    #     pygame.draw.line(screen, RED, (0, x*32), (SCREEN_WIDTH, x*32))
-    # for y in range(25):
-    #     pygame.draw.line(screen, RED, (y*32, 0), (y*32, SCREEN_HEIGHT))
+        # Draw bg
+        draw_bg()
 
-    # mouse_cursor
-    mouse_x, mouse_y = pygame.mouse.get_pos()
+        # Title Texts
+        screen.blit(variables.main_menu_title,
+                    (SCREEN_WIDTH // 2 - 215, SCREEN_HEIGHT // 2 - 200))
+        screen.blit(variables.how_2_play_text,
+                    (SCREEN_WIDTH // 2 - 75, SCREEN_HEIGHT // 2 + 130))
+        screen.blit(variables.how_2_play_text_1,
+                    (SCREEN_WIDTH // 2 - 175, SCREEN_HEIGHT // 2 + 160))
+        screen.blit(variables.how_2_play_text_2,
+                    (SCREEN_WIDTH // 2 - 160, SCREEN_HEIGHT // 2 + 190))
+        screen.blit(variables.how_2_play_text_3,
+                    (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 220))
+        screen.blit(variables.how_2_play_text_4,
+                    (SCREEN_WIDTH // 2 - 65, SCREEN_HEIGHT // 2 + 250))
 
-    font = pygame.font.SysFont(None, 24)
-    font_img = font.render(f'{mouse_x},{mouse_y}', True, (0, 255, 255))
-    screen.blit(font_img, (mouse_x + 3, mouse_y - 12))
+        # Draw buttons
+        if start_button.draw(screen):
+            start_game = True
 
-    player.update_animation()
-    player.draw()
-    pygame.draw.line(screen, RED, (0, player.image_rect.top),
-                     (SCREEN_WIDTH, player.image_rect.top))
+        if exit_button.draw(screen):
+            run = False
 
-    # Update player actions
-    if player.alive:
-        if moving_left or moving_right:
-            # 1 = run
-            player.update_action(1)
-        elif player.in_air:
-            # 2 = jump
-            player.update_action(2)
+    else:
+        # Play music
+        if levels_1to5_music_playing == False:
+            levels_1to5_music_playing = True
+            levels_1to5_music = pygame.mixer.music.load(
+                'assets/audio/music/Fluffing-a-Duck.mp3')
+            pygame.mixer.music.set_volume(0.5)
+            pygame.mixer.music.play()
+
+        # Update background
+        draw_bg()
+
+        # Draw world map
+        world.draw()
+
+        # mouse_cursor
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+
+        font = pygame.font.SysFont(None, 24)
+        font_img = font.render(f'{mouse_x},{mouse_y}', True, (0, 255, 255))
+        screen.blit(font_img, (mouse_x + 3, mouse_y - 12))
+
+        player.update_animation()
+        player.draw()
+        pygame.draw.line(screen, RED, (0, player.image_rect.top),
+                         (SCREEN_WIDTH, player.image_rect.top))
+
+        # Update player actions
+        if player.alive:
+            if moving_left or moving_right:
+                # 1 = run
+                player.update_action(1)
+            elif player.in_air:
+                # 2 = jump
+                player.update_action(2)
+            else:
+                # 0 = idle
+                player.update_action(0)
+
+            screen_scroll, level_complete = player.move(
+                moving_left, moving_right)
+
+            # Check if player completed level
+            if level_complete:
+                level_complete_sound.play()
+                level += 1
+                world_data = reset_level()
+
+                if level <= MAX_LEVELS:
+                    # Load in level data csv and create world
+                    with open(f'assets/level{level}_data.csv', newline='') as csvfile:
+                        reader = csv.reader(csvfile, delimiter=',')
+                        for x, row in enumerate(reader):
+                            for y, tile in enumerate(row):
+                                world_data[x][y] = int(tile)
+                    restart_button.action = False
+                    world = World()
+                    player = world.process_data(world_data)
+
+                if level == 2:
+                    GRAVITY = 0.2
+
+                if level == 3:
+                    GRAVITY = 0.8
+
         else:
-            # 0 = idle
-            player.update_action(0)
-
-        player.move(moving_left, moving_right)
+            screen_scroll = 0
+            screen.blit(variables.u_died_text,
+                        (SCREEN_WIDTH // 2 - 120, SCREEN_HEIGHT // 2 - 280))
+            screen.blit(variables.game_over_text,
+                        (SCREEN_WIDTH // 2 - 170, SCREEN_HEIGHT // 2 - 200))
+            if restart_button.draw(screen):
+                world_data = reset_level()
+                # Load in level data csv and create world
+                with open(f'assets/level{level}_data.csv', newline='') as csvfile:
+                    reader = csv.reader(csvfile, delimiter=',')
+                    for x, row in enumerate(reader):
+                        for y, tile in enumerate(row):
+                            world_data[x][y] = int(tile)
+                restart_button.action = False
+                world = World()
+                player = world.process_data(world_data)
 
     for event in pygame.event.get():
 
@@ -343,6 +560,7 @@ while run:
             if event.key == pygame.K_RIGHT:
                 moving_right = True
             if event.key == pygame.K_SPACE and player.alive:
+                jump_sound.play()
                 player.jump = True
 
         # Key released
