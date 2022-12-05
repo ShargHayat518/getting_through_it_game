@@ -13,7 +13,7 @@ SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 608
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption('Getting Through It')
+pygame.display.set_caption('getting_through_it')
 
 
 # Set framerate
@@ -26,14 +26,16 @@ SCROLL_THRESH = 300
 ROWS = 19
 COLS = 32
 TILE_SIZE = 32
-TILE_TYPES = 179
-MAX_LEVELS = 11
+TILE_TYPES = 180
+MAX_LEVELS = 10
 
 # Level variables
 screen_scroll = 0
 bg_scroll = 0
 level = 1
 start_game = False
+end_game = False
+start_intro = True
 
 # Defined player action variable
 moving_left = False
@@ -45,12 +47,12 @@ menu_music_playing = False
 levels_1to5_music_playing = False
 
 jump_sound = pygame.mixer.Sound('assets/audio/sounds/jump_sound.ogg')
-jump_sound.set_volume(0.5)
+jump_sound.set_volume(0.4)
 level_complete_sound = pygame.mixer.Sound(
     'assets/audio/sounds/level_complete_sound.ogg')
-level_complete_sound.set_volume(0.2)
+level_complete_sound.set_volume(0.15)
 death_sound = pygame.mixer.Sound('assets/audio/sounds/death_sound.wav')
-death_sound.set_volume(0.5)
+death_sound.set_volume(0.4)
 
 # Load background images
 level_1_img = pygame.image.load(f'assets/world/backgrounds/04.png')
@@ -76,12 +78,17 @@ tile_img_list = []
 for x in range(TILE_TYPES):
     img = pygame.image.load(f'assets/world/Tiles/{x}.png')
     img = pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE))
+    if x == 130 or x == 156:
+        img.set_alpha(0)
+    if x == 37:
+        img = pygame.transform.rotate(img, 180)
     tile_img_list.append(img)
 
 
 # Define colors
 BG = (0, 0, 0)
 RED = (255, 0, 0)
+PINK = (235, 65, 54)
 
 
 def draw_bg():
@@ -141,11 +148,38 @@ class Button():
         return self.action
 
 
+class ScreenFade():
+    def __init__(self, direction, color, speed):
+        self.direction = direction
+        self.color = color
+        self.speed = speed
+        self.fade_counter = 0
+
+    def fade(self):
+        fade_complete = False
+        self.fade_counter += self.speed
+
+        if self.direction == 1:
+            pygame.draw.rect(screen, self.color,
+                             (0 - self.fade_counter, 0, SCREEN_WIDTH // 2, SCREEN_HEIGHT))
+            pygame.draw.rect(screen, self.color,
+                             (SCREEN_WIDTH // 2 + self.fade_counter, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
+        if self.direction == 2:
+            pygame.draw.rect(screen, self.color,
+                             (0, 0, SCREEN_WIDTH, 0 + self.fade_counter))
+
+        if self.fade_counter >= (SCREEN_HEIGHT // 2 + 100):
+            fade_complete = True
+
+        return fade_complete
+
+
 class World():
     def __init__(self):
         self.obstacle_list = []
         self.decoration_list = []
         self.completion_list = []
+        self.death_list = []
 
     def process_data(self, data):
         # Iterate through each row in level csv data file
@@ -160,15 +194,11 @@ class World():
                         tile_data = self.tile_processor(tile, x, y)
                         self.obstacle_list.append(tile_data)
 
-                    # Grass blocks
-                    if tile == 75:
-                        tile_data = self.tile_processor(tile, x, y)
-                        self.obstacle_list.append(tile_data)
-
-                    # Dirt blocks
-                    if tile == 122:
-                        tile_data = self.tile_processor(tile, x, y)
-                        self.obstacle_list.append(tile_data)
+                    # Grass blocks & Dirt Blocks & Other regular collision blocks
+                    for reg_col_tile in variables.reg_collision_tile_list:
+                        if tile == reg_col_tile:
+                            tile_data = self.tile_processor(reg_col_tile, x, y)
+                            self.obstacle_list.append(tile_data)
 
                     # Completion blocks (flag)
                     for comp_tile in variables.completion_tile_list:
@@ -176,11 +206,26 @@ class World():
                             tile_data = self.tile_processor(tile, x, y)
                             self.completion_list.append(tile_data)
 
+                    # Death blocks
+                    if tile == 37:
+                        tile_data = self.tile_processor(tile, x, y)
+                        self.death_list.append(tile_data)
+
                     # Decoration blocks
                     for dec_tile in variables.dec_tile_list:
                         if tile == dec_tile:
                             tile_data = self.tile_processor(tile, x, y)
                             self.decoration_list.append(tile_data)
+
+                    # Invisible blocks
+                    if tile == 156:
+                        tile_data = self.tile_processor(tile, x, y)
+                        self.obstacle_list.append(tile_data)
+
+                    # Teleport colission block
+                    if tile == 130:
+                        tile_data = self.tile_processor(tile, x, y)
+                        self.decoration_list.append(tile_data)
 
                     # Player spawn location
                     if tile == 777:
@@ -198,6 +243,9 @@ class World():
         for completion_tile in self.completion_list:
             completion_tile[1][0] += screen_scroll
             screen.blit(completion_tile[0], completion_tile[1])
+        for death_tile in self.death_list:
+            death_tile[1][0] += screen_scroll
+            screen.blit(death_tile[0], death_tile[1])
 
     def tile_processor(self, tile, x, y):
         img = tile_img_list[tile]
@@ -231,7 +279,7 @@ class Entity(pygame.sprite.Sprite):
 
         # Names of the image files
         animation_types = ['Pink_Monster_Idle_4',
-                           'Pink_Monster_Run_6_v2', 'Pink_Monster_Jump_6']
+                           'Pink_Monster_Run_6', 'Pink_Monster_Jump_6']
         animation_frames = [4, 6, 8]
 
         self.update_time = pygame.time.get_ticks()
@@ -309,11 +357,19 @@ class Entity(pygame.sprite.Sprite):
 
     def draw(self):
 
-        screen.blit(
-            # Source
-            pygame.transform.flip(self.image, self.flip, False),
-            # Destination
-            (self.image_rect.x, self.image_rect.y))
+        if moving_left or moving_right:
+            screen.blit(
+                # Source
+                pygame.transform.flip(self.image, self.flip, False),
+                # Destination
+                (self.image_rect.x, self.image_rect.y+3))
+
+        else:
+            screen.blit(
+                # Source
+                pygame.transform.flip(self.image, self.flip, False),
+                # Destination
+                (self.image_rect.x, self.image_rect.y))
 
     def move(self, moving_left, moving_right):
 
@@ -337,7 +393,7 @@ class Entity(pygame.sprite.Sprite):
             self.direction = 1
 
         if self.jump and not self.in_air:
-            # Jump height
+            # Jump height level 8
             self.vel_y = -10
             self.jump = False
             self.in_air = True
@@ -350,8 +406,7 @@ class Entity(pygame.sprite.Sprite):
 
         # Check collision w/ tiles
         for tile in world.obstacle_list:
-
-            # # Check collision in x direction
+            # Check collision in x direction
             if tile[1].colliderect(self.image_rect.x + dx, self.image_rect.y, self.width, self.height):
                 dx = 0
 
@@ -374,6 +429,20 @@ class Entity(pygame.sprite.Sprite):
             if tile[1].colliderect(self.image_rect.x + dx, self.image_rect.y, self.width, self.height):
                 level_complete_sound.play()
                 level_complete = True
+
+        # Check collision w/ teleport block
+        for tile in world.decoration_list:
+            if tile[2] == 130:
+                if tile[1].colliderect(self.image_rect.x + dx, self.image_rect.y, self.width, self.height):
+                    if level == 5:
+                        dx += 450
+                        dy -= 400
+
+        # Check collision w/ death block
+        for tile in world.death_list:
+            if tile[1].colliderect(self.image_rect.x + dx, self.image_rect.y, self.width, self.height):
+                death_sound.play()
+                player.alive = False
 
         # Check if player goes off edge of screen WIDTH (left/right)
         if self.image_rect.left + dx < 0 or self.image_rect.right + dx > SCREEN_WIDTH:
@@ -426,6 +495,10 @@ world = World()
 
 # TODO: THERES A BIG PROBLEM WITH THIS?!?!
 player = world.process_data(world_data)
+
+# Fades
+intro_fade = ScreenFade(1, BG, 16)
+death_fade = ScreenFade(2, PINK, 12)
 ''''''
 
 run = True
@@ -434,14 +507,14 @@ while run:
     clock.tick(FPS)
 
     # Interface handling
-    if start_game == False:
+    if start_game == False and end_game == False:
 
         if menu_music_playing == False:
             menu_music_playing = True
             menu_music = pygame.mixer.music.load(
                 'assets/audio/music/Komiku_-_02_-_Poupis_Theme.mp3')
             pygame.mixer.music.set_volume(0.5)
-            pygame.mixer.music.play()
+            pygame.mixer.music.play(-1, 0.0, 250)
 
         # Draw bg
         draw_bg()
@@ -450,15 +523,17 @@ while run:
         screen.blit(variables.main_menu_title,
                     (SCREEN_WIDTH // 2 - 215, SCREEN_HEIGHT // 2 - 200))
         screen.blit(variables.how_2_play_text,
-                    (SCREEN_WIDTH // 2 - 75, SCREEN_HEIGHT // 2 + 130))
+                    (SCREEN_WIDTH // 2 - 75, SCREEN_HEIGHT // 2 + 100))
         screen.blit(variables.how_2_play_text_1,
-                    (SCREEN_WIDTH // 2 - 175, SCREEN_HEIGHT // 2 + 160))
+                    (SCREEN_WIDTH // 2 - 175, SCREEN_HEIGHT // 2 + 130))
         screen.blit(variables.how_2_play_text_2,
-                    (SCREEN_WIDTH // 2 - 160, SCREEN_HEIGHT // 2 + 190))
+                    (SCREEN_WIDTH // 2 - 160, SCREEN_HEIGHT // 2 + 160))
         screen.blit(variables.how_2_play_text_3,
-                    (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 220))
+                    (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 190))
         screen.blit(variables.how_2_play_text_4,
-                    (SCREEN_WIDTH // 2 - 65, SCREEN_HEIGHT // 2 + 250))
+                    (SCREEN_WIDTH // 2 - 240, SCREEN_HEIGHT // 2 + 220))
+        screen.blit(variables.how_2_play_text_5,
+                    (SCREEN_WIDTH // 2 - 70, SCREEN_HEIGHT // 2 + 250))
 
         # Draw buttons
         if start_button.draw(screen):
@@ -467,14 +542,14 @@ while run:
         if exit_button.draw(screen):
             run = False
 
-    else:
+    elif start_game == True and end_game == False:
         # Play music
         if levels_1to5_music_playing == False:
             levels_1to5_music_playing = True
             levels_1to5_music = pygame.mixer.music.load(
                 'assets/audio/music/Fluffing-a-Duck.mp3')
             pygame.mixer.music.set_volume(0.5)
-            pygame.mixer.music.play()
+            pygame.mixer.music.play(-1, 0.0, 250)
 
         # Update background
         draw_bg()
@@ -482,17 +557,20 @@ while run:
         # Draw world map
         world.draw()
 
-        # mouse_cursor
-        mouse_x, mouse_y = pygame.mouse.get_pos()
+        # Draw level text indicator:
+        level_text = variables.level_text_func(level)
+        screen.blit(level_text, (80, 10))
 
-        font = pygame.font.SysFont(None, 24)
-        font_img = font.render(f'{mouse_x},{mouse_y}', True, (0, 255, 255))
-        screen.blit(font_img, (mouse_x + 3, mouse_y - 12))
+        # mouse_cursor
+        # mouse_x, mouse_y = pygame.mouse.get_pos()
+        # font = pygame.font.SysFont(None, 24)
+        # font_img = font.render(f'{mouse_x},{mouse_y}', True, (0, 255, 255))
+        # screen.blit(font_img, (mouse_x + 3, mouse_y - 12))
 
         player.update_animation()
         player.draw()
-        pygame.draw.line(screen, RED, (0, player.image_rect.top),
-                         (SCREEN_WIDTH, player.image_rect.top))
+
+        intro_fade.fade()
 
         # Update player actions
         if player.alive:
@@ -509,10 +587,49 @@ while run:
             screen_scroll, level_complete = player.move(
                 moving_left, moving_right)
 
+            # Some level handling
+            if level == 1:
+                GRAVITY = 0.8
+                player.speed = 3
+
+            # Level 2
+            if level == 2:
+                GRAVITY = 0.5
+
+            # Level 3 = Invisible blocks level
+            if level == 3:
+                GRAVITY = 0.8
+
+            # Level 4 = High speed level
+            if level == 4:
+                player.speed = 50
+
+            # Level 5 = Teleport level
+            if level == 5:
+                player.speed = 3
+
+            # Level 5 = Teleport level
+            if level == 6:
+                player.speed = 1
+
+            if level == 7:
+                GRAVITY = 0.9
+
+            if level == 8:
+                GRAVITY = 0.4
+
+            if level == 9:
+                GRAVITY = 0.13
+                player.speed = 20
+
+            if level == 10:
+                GRAVITY = 0.3
+                player.speed = 3
+
             # Check if player completed level
             if level_complete:
-                level_complete_sound.play()
                 level += 1
+                level_complete_sound.play()
                 world_data = reset_level()
 
                 if level <= MAX_LEVELS:
@@ -526,29 +643,37 @@ while run:
                     world = World()
                     player = world.process_data(world_data)
 
-                if level == 2:
-                    GRAVITY = 0.2
-
-                if level == 3:
-                    GRAVITY = 0.8
+                else:
+                    end_game = True
 
         else:
             screen_scroll = 0
-            screen.blit(variables.u_died_text,
-                        (SCREEN_WIDTH // 2 - 120, SCREEN_HEIGHT // 2 - 280))
-            screen.blit(variables.game_over_text,
-                        (SCREEN_WIDTH // 2 - 170, SCREEN_HEIGHT // 2 - 200))
-            if restart_button.draw(screen):
-                world_data = reset_level()
-                # Load in level data csv and create world
-                with open(f'assets/level{level}_data.csv', newline='') as csvfile:
-                    reader = csv.reader(csvfile, delimiter=',')
-                    for x, row in enumerate(reader):
-                        for y, tile in enumerate(row):
-                            world_data[x][y] = int(tile)
-                restart_button.action = False
-                world = World()
-                player = world.process_data(world_data)
+            if death_fade.fade():
+                screen.blit(variables.u_died_text,
+                            (SCREEN_WIDTH // 2 - 120, SCREEN_HEIGHT // 2 - 280))
+                screen.blit(variables.game_over_text,
+                            (SCREEN_WIDTH // 2 - 170, SCREEN_HEIGHT // 2 - 200))
+                if restart_button.draw(screen):
+                    world_data = reset_level()
+                    # Load in level data csv and create world
+                    with open(f'assets/level{level}_data.csv', newline='') as csvfile:
+                        reader = csv.reader(csvfile, delimiter=',')
+                        for x, row in enumerate(reader):
+                            for y, tile in enumerate(row):
+                                world_data[x][y] = int(tile)
+                    restart_button.action = False
+                    world = World()
+                    player = world.process_data(world_data)
+
+    elif end_game == True:
+        screen_scroll = 0
+        screen.blit(variables.game_over_text,
+                    (SCREEN_WIDTH // 2 - 175, SCREEN_HEIGHT // 2 - 200))
+        screen.blit(variables.you_win_text,
+                    (SCREEN_WIDTH // 2 - 135, SCREEN_HEIGHT // 2 - 100))
+        if exit_button.draw(screen):
+            run = False
+            pygame.quit()
 
     for event in pygame.event.get():
 
@@ -562,6 +687,8 @@ while run:
             if event.key == pygame.K_SPACE and player.alive:
                 jump_sound.play()
                 player.jump = True
+            if event.key == pygame.K_SPACE and not player.alive:
+                restart_button.action = True
 
         # Key released
         if event.type == pygame.KEYUP:

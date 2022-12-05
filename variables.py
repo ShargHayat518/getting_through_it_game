@@ -12,6 +12,7 @@ main_menu_title = comicsans_font_load_medium.render(
     'getting_through_it', True, (0, 0, 0))
 u_died_text = comicsans_font_load.render('u died :(', True, (0, 0, 0))
 game_over_text = comicsans_font_load.render('Game Over!', True, (0, 0, 0))
+you_win_text = comicsans_font_load.render('you win :)', True, (0, 0, 0))
 
 how_2_play_text = comicsans_font_load_small.render(
     'how 2 play:', True, (0, 0, 0))
@@ -22,7 +23,16 @@ how_2_play_text_2 = comicsans_font_load_small.render(
 how_2_play_text_3 = comicsans_font_load_small.render(
     'some levels are tricky', True, (0, 0, 0))
 how_2_play_text_4 = comicsans_font_load_small.render(
+    'arrow keys to move, space to jump', True, (0, 0, 0))
+how_2_play_text_5 = comicsans_font_load_small.render(
     'good luck!', True, (0, 0, 0))
+
+
+def level_text_func(level):
+    level_text = comicsans_font_load_small.render(
+        f'level {level}', True, (0, 0, 0))
+    return level_text
+
 
 # Animation Lists
 Pink_Monster_Idle_4 = [
@@ -37,17 +47,17 @@ Pink_Monster_Idle_4 = [
 
 Pink_Monster_Run_6 = [
     # 2
-    (71, 5, 18, 26),
+    (71, 4, 18, 26),
     # 3
-    (103, 3, 18, 27),
+    (103, 4, 18, 26),
     # 4
     (135, 4, 18, 26),
     # 5
-    (167, 5, 18, 26),
+    (167, 4, 18, 26),
     # 0
-    (7, 4, 18, 27),
+    (7, 4, 18, 26),
     # 1
-    (39, 4, 18, 27),
+    (39, 4, 18, 26),
 ]
 
 Pink_Monster_Jump_6 = [
@@ -70,6 +80,7 @@ animation_pos_list.append(Pink_Monster_Jump_6)
 # Decorative Tiles
 dec_tile_list = [1, 2, 26, 28, 56, 57, 65, 66, 70, 71, 93,
                  99, 116, 124, 125, 126, 127, 128, 129, 136, 137]
+reg_collision_tile_list = [11, 75, 122, 153, 154, 155, 157]
 
 # Menu button lists
 btn_UP = (1, 1, 48, 16)
