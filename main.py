@@ -19,7 +19,7 @@ comicsans_font_load_small = pygame.font.SysFont('Comic Sans MS', 30)
 # Set framerate
 clock = pygame.time.Clock()
 FPS = 60
-t0 = time.time()
+run_time_once = True
 
 # Define game variables
 GRAVITY = 0.8
@@ -544,9 +544,13 @@ while run:
             run = False
 
     elif start_game == True and end_game == False:
+        if run_time_once:
+            t0 = time.time()
+            run_time_once = False
+
         t1 = time.time()
         dt = t1 - t0
-
+        print(f'dt = {dt}, t0 = {t0}, t1 = {t1}')
         counting_time_secs = dt % 3600
         counting_time_mins = counting_time_secs // 60
         counting_time_secs = counting_time_secs % 60
@@ -573,12 +577,6 @@ while run:
         level_text = variables.level_text_func(level)
         screen.blit(level_text, (80, 10))
         screen.blit(counting_text, (200, 10))
-
-        # mouse_cursor
-        # mouse_x, mouse_y = pygame.mouse.get_pos()
-        # font = pygame.font.SysFont(None, 24)
-        # font_img = font.render(f'{mouse_x},{mouse_y}', True, (0, 255, 255))
-        # screen.blit(font_img, (mouse_x + 3, mouse_y - 12))
 
         player.update_animation()
         player.draw()
