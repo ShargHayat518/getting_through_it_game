@@ -14,11 +14,12 @@ SCREEN_HEIGHT = 608
 
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('getting_through_it')
-
+comicsans_font_load_small = pygame.font.SysFont('Comic Sans MS', 30)
 
 # Set framerate
 clock = pygame.time.Clock()
 FPS = 60
+t0 = time.time()
 
 # Define game variables
 GRAVITY = 0.8
@@ -543,6 +544,17 @@ while run:
             run = False
 
     elif start_game == True and end_game == False:
+        t1 = time.time()
+        dt = t1 - t0
+
+        counting_time_secs = dt % 3600
+        counting_time_mins = counting_time_secs // 60
+        counting_time_secs = counting_time_secs % 60
+        counting_string = ("%02d:%02d" %
+                           (counting_time_mins, counting_time_secs))
+        counting_text = comicsans_font_load_small.render(
+            str(counting_string), True, (0, 0, 0))
+
         # Play music
         if levels_1to5_music_playing == False:
             levels_1to5_music_playing = True
@@ -560,6 +572,7 @@ while run:
         # Draw level text indicator:
         level_text = variables.level_text_func(level)
         screen.blit(level_text, (80, 10))
+        screen.blit(counting_text, (200, 10))
 
         # mouse_cursor
         # mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -569,7 +582,6 @@ while run:
 
         player.update_animation()
         player.draw()
-
         intro_fade.fade()
 
         # Update player actions
@@ -671,6 +683,10 @@ while run:
                     (SCREEN_WIDTH // 2 - 175, SCREEN_HEIGHT // 2 - 200))
         screen.blit(variables.you_win_text,
                     (SCREEN_WIDTH // 2 - 135, SCREEN_HEIGHT // 2 - 100))
+        final_time = comicsans_font_load_small.render(
+            str("completion time: " + counting_string), True, (0, 0, 0))
+        screen.blit(final_time,
+                    (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 130))
         if exit_button.draw(screen):
             run = False
             pygame.quit()

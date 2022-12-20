@@ -26,6 +26,8 @@ how_2_play_text_4 = comicsans_font_load_small.render(
     'arrow keys to move, space to jump', True, (0, 0, 0))
 how_2_play_text_5 = comicsans_font_load_small.render(
     'good luck!', True, (0, 0, 0))
+timer_test = comicsans_font_load_small.render(
+    'good luck!', True, (0, 0, 0))
 
 
 def level_text_func(level):
