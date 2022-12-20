@@ -1,5 +1,7 @@
 # getting_through_it_game
 
+By: Shargeel Hayat, COMP4555
+
 Pitch:
 getting_through_it is a 2D-Side scrolling puzzle game which has the same basic layout for every level, the objective of the game is to complete the level by reaching the endpoint, but as every level passes the next level has some kind of trick/gimmick that the user has to figure out.The levels start out simple, for example the first few levels will have obstacles that the user has to overcome to finish the level, but as the user progresses the levels get trickier and the user has to figure out how to finish the level.
 
